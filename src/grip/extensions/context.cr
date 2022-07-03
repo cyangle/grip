@@ -148,6 +148,10 @@ module Grip
         @response.status_code = status_code.to_i
         self
       end
+
+      def exec
+        with self yield
+      end
     end
   end
 end
