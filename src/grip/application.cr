@@ -78,7 +78,7 @@ module Grip
       end
     {% end %}
 
-    protected def schema : String
+    protected def scheme : String
       ssl ? "https" : "http"
     end
 
@@ -97,7 +97,7 @@ module Grip
         {% end %}
       end
 
-      Log.info { "Listening at #{schema}://#{host}:#{port}" }
+      Log.info { "Listening at #{scheme}://#{host}:#{port}" }
 
       if @environment != "test"
         {% begin %}
