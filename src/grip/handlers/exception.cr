@@ -44,7 +44,7 @@ module Grip
           if @environment == "production"
             context.response.print("An error occured, please try again later.")
           else
-            context.response.print(Grip::Minuscule::ExceptionPage.for_runtime_exception(context, exception).to_s)
+            context.response.print(Grip::Minuscule::ExceptionPage.new(context, exception))
           end
 
           context.response.close
