@@ -78,7 +78,7 @@ module Grip
       end
     {% end %}
 
-    protected def scheme : String
+    def scheme : String
       ssl ? "https" : "http"
     end
 
