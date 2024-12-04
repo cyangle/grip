@@ -92,7 +92,7 @@ module Grip
       end
 
       # Sends a response with the content formated as json.
-      def json(content, content_type = "application/json; charset=UTF-8")
+      def json(content, content_type = "application/json")
         @response.headers.merge!({"Content-Type" => content_type})
         @response.print(content.to_json)
         self

@@ -80,18 +80,6 @@ describe "Context" do
       ("UTF-8".in? client_response.headers["Content-Type"]).should be_true
     end
 
-    it "encodes json in utf-8" do
-      http_handler = Grip::Routers::Http.new
-      http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
-        context.json({:message => "👋🏼 grip"}).halt
-      end
-
-      request = HTTP::Request.new("GET", "/")
-      client_response = call_request_on_app(request, http_handler)
-      client_response.body.should eq "{\"message\":\"👋🏼 grip\"}"
-      ("UTF-8".in? client_response.headers["Content-Type"]).should be_true
-    end
-
     it "encodes html in utf-8" do
       http_handler = Grip::Routers::Http.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
