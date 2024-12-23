@@ -74,7 +74,7 @@ module Grip
       end
 
       macro ws(route, resource, **kwargs)
-        @websocket_handler.add_route("", "#{@scopes.join()}#{{{route}}}", {{ resource }}.new, @valves.clone(), nil)
+        @websocket_handler.add_route("", "#{@scopes.join()}#{{{route}}}", {{ resource }}.instance, @valves.clone(), nil)
       end
     end
   end
