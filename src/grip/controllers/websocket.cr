@@ -1,18 +1,17 @@
 module Grip
   module Controllers
-    class WebSocket
+    class WebSocket < HTTP::WebSocket
       alias Context = HTTP::Server::Context
       alias Socket = HTTP::WebSocket::Protocol
 
       include HTTP::Handler
       include Helpers::Singleton
 
-      getter? closed = false
-
       # :nodoc:
       def initialize
         @buffer = Bytes.new(4096)
         @current_message = IO::Memory.new
+        @ws = HTTP::WebSocket::Protocol.new(IO::Memory.new, sync_close: true)
       end
 
       def on_open(context : Context, socket : Socket) : Void
@@ -31,10 +30,6 @@ module Grip
       end
 
       def on_close(context : Context, socket : Socket, close_code : HTTP::WebSocket::CloseCode | Int?, message : String) : Void
-      end
-
-      protected def check_open
-        raise IO::Error.new "Closed socket" if closed?
       end
 
       def run(context, socket)
@@ -125,9 +120,10 @@ module Grip
         response.headers["Upgrade"] = "websocket"
         response.headers["Connection"] = "Upgrade"
         response.headers["Sec-WebSocket-Accept"] = accept_code
+
         response.upgrade do |io|
-          socket = HTTP::WebSocket::Protocol.new(io, sync_close: true)
-          run(context, socket)
+          @ws = HTTP::WebSocket::Protocol.new(io, sync_close: true)
+          run(context, @ws)
         end
 
         context
