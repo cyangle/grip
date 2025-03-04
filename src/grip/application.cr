@@ -4,54 +4,39 @@ module Grip
   class Application
     include Grip::Macros::Dsl
 
-    getter environment : String = "development"
+    DEFAULT_HOST        = "0.0.0.0"
+    DEFAULT_PORT        = 4004
+    DEFAULT_ENVIRONMENT = "development"
+    DEFAULT_REUSE_PORT  = false
 
-    getter http_handler : Grip::Routers::Http
-    getter exception_handler : Grip::Handlers::Exception
-    getter pipeline_handler : Grip::Handlers::Pipeline
-    getter websocket_handler : Grip::Routers::WebSocket
-    getter static_handlers : Array(Grip::Handlers::Static) = [] of Grip::Handlers::Static
+    property host : String
+    property port : Int32
+    property environment : String
+    property? reuse_port : Bool
 
     getter scopes : Array(String) = [] of String
     getter valves : Array(Symbol) = [] of Symbol
-    getter valve : Symbol?
-    
-    property router : Array(HTTP::Handler)
+    getter valve : Symbol? = nil
 
-    def initialize(@environment : String = "development")
-      @http_handler = Grip::Routers::Http.new
-      @websocket_handler = Grip::Routers::WebSocket.new
-      @pipeline_handler = Grip::Handlers::Pipeline.new(@http_handler, @websocket_handler)
-      @exception_handler = Grip::Handlers::Exception.new(@environment)
+    getter handlers : Array(HTTP::Handler) = [] of HTTP::Handler
 
-      @router = [
-        @exception_handler,
-        @pipeline_handler,
-        @websocket_handler,
-        @http_handler,
-      ] of HTTP::Handler
-    end
-
-    def host : String
-      "0.0.0.0"
-    end
-
-    def port : Int32
-      4004
-    end
-
-    def reuse_port : Bool
-      false
-    end
-
-    def server : HTTP::Server
-      @static_handlers.each do |handler|
-        @router.insert(1, handler)
+    def initialize(
+      @environment : String = DEFAULT_ENVIRONMENT,
+      @host : String = DEFAULT_HOST,
+      @port : Int32 = DEFAULT_PORT,
+      @reuse_port : Bool = DEFAULT_REUSE_PORT,
+      @handlers : Array(HTTP::Handler) = [] of HTTP::Handler
+    )
+      exception_handler = @handlers.find { |handler| handler.is_a?(Grip::Handlers::Exception) }
+      
+      if exception_handler
+        exception_handler
+          .as(Grip::Handlers::Exception)
+          .environment = @environment
       end
-
-      HTTP::Server.new(@router)
     end
 
+    # SSL/TLS configuration
     def key_file : String
       ENV["KEY"]? || ""
     end
@@ -65,15 +50,12 @@ module Grip
         false
       end
     {% else %}
-      def ssl : OpenSSL::SSL::Context::Server
+      def ssl : OpenSSL::SSL::Context::Server?
+        return nil if key_file.empty? || cert_file.empty?
+
         context = OpenSSL::SSL::Context::Server.new
-
-        context
-          .private_key = key_file
-
-        context
-          .certificate_chain = cert_file
-
+        context.private_key = key_file
+        context.certificate_chain = cert_file
         context
       end
     {% end %}
@@ -82,49 +64,49 @@ module Grip
       ssl ? "https" : "http"
     end
 
-    def run
-      server = self.server
+    # Server setup and running
+    def server : HTTP::Server
+      HTTP::Server.new(@handlers)
+    end
 
-      unless server.each_address { |_| break true }
-        {% if flag?(:ssl) %}
-          if ssl
-            server.bind_tls(host, port, ssl, reuse_port)
-          else
-            server.bind_tcp(host, port, reuse_port)
-          end
-        {% else %}
-          server.bind_tcp(host, port, reuse_port)
-        {% end %}
-      end
+    def run
+      server_instance = server
+      bind_server(server_instance)
 
       Log.info { "Listening at #{scheme}://#{host}:#{port}" }
+      setup_signal_handling unless environment == "test"
+      server_instance.listen unless environment == "test"
+    end
 
-      if @environment != "test"
-        {% begin %}
-          {% version = Crystal::VERSION.gsub(/[^0-9.]/, "").split(".").map(&.to_i) %}
-
-          {% major = version[0] %}
-          {% minor = version[1] %}
-          {% patch = version[2] %}
-
-          # 0.X.X
-          {% if major < 1 %}
-            Signal::INT.trap { exit }
-          {% end %}
-
-          # 1.0.0 to 1.11.X
-          {% if major == 1 && minor < 12 %}
-            Process.on_interrupt { exit }
-          {% end %}
-
-          # 1.12.X to 1.X.X
-          {% if major == 1 && minor >= 12 %}
-            Process.on_terminate { exit }
-          {% end %}
+    private def bind_server(server : HTTP::Server)
+      unless server.each_address { |_| break true }
+        {% if flag?(:ssl) %}
+          if ssl_context = ssl
+            server.bind_tls(host, port, ssl_context, reuse_port?)
+          else
+            server.bind_tcp(host, port, reuse_port?)
+          end
+        {% else %}
+          server.bind_tcp(host, port, reuse_port?)
         {% end %}
-
-        server.listen
       end
+    end
+
+    private def setup_signal_handling
+      {% begin %}
+        {% version = Crystal::VERSION.gsub(/[^0-9.]/, "").split(".").map(&.to_i) %}
+        {% major = version[0] %}
+        {% minor = version[1] %}
+
+        # Crystal version-specific signal handling
+        {% if major < 1 %}
+          Signal::INT.trap { exit }
+        {% elsif major == 1 && minor < 12 %}
+          Process.on_interrupt { exit }
+        {% else %}
+          Process.on_terminate { exit }
+        {% end %}
+      {% end %}
     end
   end
 end

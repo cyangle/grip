@@ -1,42 +1,65 @@
 module Grip
   module Handlers
-    # :nodoc:
-    class Pipeline
-      include HTTP::Handler
+    class Pipeline < Base
+      CACHED_PIPES = {} of Array(Symbol) => Array(Middleware::Base)
 
-      property pipeline : Hash(Symbol, Array(HTTP::Handler))
+      property pipeline : Hash(Symbol, Array(Middleware::Base))
+      property http_handler : ::HTTP::Handler?
+      property websocket_handler : ::HTTP::Handler?
 
-      CACHED_PIPES = {} of Array(Symbol) => Array(HTTP::Handler)
-
-      def initialize(@http_handler : Grip::Routers::Http, @websocket_handler : Grip::Routers::WebSocket)
-        @pipeline = Hash(Symbol, Array(HTTP::Handler)).new
+      def initialize(
+        @http_handler = nil,
+        @websocket_handler = nil
+      )
+        @pipeline = Hash(Symbol, Middleware::Base).new
       end
 
-      def add_pipe(valve : Symbol, pipe : HTTP::Handler)
-        if @pipeline.has_key?(valve)
-          size = @pipeline[valve].size
-          @pipeline[valve].push(pipe)
-          @pipeline[valve].[size - 1].next = pipe
-        else
-          @pipeline[valve] = [pipe.as(HTTP::Handler)]
+      def add_route(
+        verb : String,
+        path : String,
+        handler : ::HTTP::Handler,
+        via : Symbol? | Array(Symbol)? = nil,
+        override : Proc(::HTTP::Server::Context, ::HTTP::Server::Context)? = nil
+      ) : Nil
+      end
+
+      def find_route(verb : String, path : String) : Radix::Result(Route)
+        Radix::Result(Route).new
+      end
+
+      def call(context : ::HTTP::Server::Context)
+        if (websocket_handler && match_via_websocket(context)) ||
+           (http_handler && match_via_http(context))
+          return call_next(context)
         end
+        call_next(context)
       end
 
-      def get(valve : Symbol)
-        @pipeline[valve]
+      def add_pipe(
+        valve : Symbol,
+        pipe : ::HTTP::Handler,
+        http_handler : ::HTTP::Handler? = nil,
+        websocket_handler : ::HTTP::Handler? = nil
+      ) : Nil
+        @http_handler = http_handler
+        @websocket_handler = websocket_handler
+
+        handlers = @pipeline[valve] ||= Array(Middleware::Base).new
+        handlers << pipe
+        handlers[-2]?.try &.next = pipe
       end
 
-      def get(valves : Array(Symbol))
-        if CACHED_PIPES[valves]?
-          return CACHED_PIPES[valves]
-        end
+      def get(valve : Symbol) : Array(Middleware::Base)?
+        @pipeline[valve]?
+      end
 
-        pipes = [] of HTTP::Handler
+      def get(valves : Array(Symbol)) : Array(Middleware::Base)
+        return CACHED_PIPES[valves] if CACHED_PIPES.has_key?(valves)
+
+        pipes = Array(Middleware::Base).new
 
         valves.each do |valve|
-          @pipeline[valve].each do |_pipe|
-            pipes.push(_pipe)
-          end
+          @pipeline[valve]?.try &.each { |pipe| pipes << pipe }
         end
 
         CACHED_PIPES[valves] = pipes
@@ -47,38 +70,33 @@ module Grip
         nil
       end
 
-      def match_via_websocket(context : HTTP::Server::Context) : Bool
-        route = @websocket_handler.find_route("", context.request.path)
+      def match_via_websocket(context : ::HTTP::Server::Context) : Bool
+        return false unless websocket_handler = @websocket_handler
+        ws_handler = websocket_handler.as(WebSocket)
 
-        unless route.found? && @websocket_handler.websocket_upgrade_request?(context)
-          return false
-        end
+        route = ws_handler.find_route("", context.request.path)
+        return false unless route.found? && ws_handler.websocket_upgrade_request?(context)
 
-        context.parameters = Grip::Parsers::ParameterBox.new(context.request, route.params)
-        route.payload.match_via_keyword(context, self)
-
+        context.parameters = Parsers::ParameterBox.new(context.request, route.params)
+        route.payload.process_pipeline(context, self)
         true
       end
 
-      def match_via_http(context : HTTP::Server::Context) : Bool
-        route = @http_handler.find_route(context.request.method.as(String), context.request.path)
-        route = @http_handler.find_route("ALL", context.request.path) unless route.found?
+      def match_via_http(context : ::HTTP::Server::Context) : Bool
+        return false unless http_handler = @http_handler
+        http = http_handler.as(HTTP)
 
-        unless route.found?
-          return false
-        end
+        route = find_http_route(http, context)
+        return false unless route.found?
 
-        context.parameters = Grip::Parsers::ParameterBox.new(context.request, route.params)
-        route.payload.match_via_keyword(context, self)
-
+        context.parameters = Parsers::ParameterBox.new(context.request, route.params)
+        route.payload.process_pipeline(context, self)
         true
       end
 
-      def call(context : HTTP::Server::Context)
-        return call_next(context) if match_via_websocket(context)
-        return call_next(context) if match_via_http(context)
-
-        call_next(context)
+      private def find_http_route(http : HTTP, context : ::HTTP::Server::Context) : Radix::Result(Route)
+        route = http.find_route(context.request.method, context.request.path)
+        route.found? ? route : http.find_route("ALL", context.request.path)
       end
     end
   end

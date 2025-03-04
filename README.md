@@ -43,13 +43,15 @@ This project exists due to the fact that Kemal lacks one crucial part of a frame
 
 Add this to your application's `application.cr`:
 
-```ruby
+```crystal
 require "grip"
 
-class IndexController < Grip::Controllers::Http
+class IndexController
+  include Grip::Controllers::HTTP
+
   def get(context : Context) : Context
     context
-      .put_status(200) # Assign the status code to 200 OK.
+      .put_status(200) # Assign the status code as 200 OK.
       .json({"id" => 1}) # Respond with JSON content.
       .halt # Close the connection.
   end
@@ -68,23 +70,30 @@ class IndexController < Grip::Controllers::Http
 end
 
 class Application < Grip::Application
-  def initialize(environment : String)
+  def initialize
     # By default the environment is set to "development".
-    super(environment)
+    super(
+      environment: ENV["ENVIRONMENT"]? || "production"
+      handlers: [
+        Grip::Handlers::Log.new,
+        Grip::Handlers::HTTP.new
+      ] of HTTP::Handler
+    )
 
+    routes()
+  end
+
+  def routes()
     scope "/api" do
       scope "/v1" do
         get "/", IndexController
         get "/:id", IndexController, as: :index
       end
     end
-
-    # Enable request/response logging.
-    router.insert(0, Grip::Handlers::Log.new)
   end
 end
 
-app = Application.new(environment: "development")
+app = Application.new
 app.run
 ```
 
@@ -107,7 +116,7 @@ shards install
 ## API Reference
 
 Documentation can be found on the [official website of the Grip framework](https://grip-framework.github.io/docs/) or
-the [CrystalDoc website](https://crystaldoc.info/github/grip-framework/grip/v2.0.3/index.html).
+the [CrystalDoc website](https://crystaldoc.info/github/grip-framework/grip/v4.0.0/index.html).
 
 ## Contribute
 

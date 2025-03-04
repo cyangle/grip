@@ -3,7 +3,9 @@ require "../src/*"
 
 include Grip
 
-class ErrorController < Grip::Controllers::Exception
+class ErrorController
+  include Grip::Controllers::Exception
+
   def call(context : Context) : Context
     context
       .halt
@@ -12,7 +14,12 @@ end
 
 class ErrorApplication < Grip::Application
   def initialize
-    super(environment: "test")
+    super(
+      environment: "test",
+      handlers: [
+        Grip::Handlers::Exception.new,
+      ] of HTTP::Handler
+    )
 
     exception Grip::Exceptions::NotFound, ErrorController
   end
@@ -24,7 +31,12 @@ end
 
 class HttpApplication < Grip::Application
   def initialize
-    super(environment: "test")
+    super(
+      environment: "test",
+      handlers: [
+        Grip::Handlers::HTTP.new,
+      ] of HTTP::Handler
+    )
 
     get "/", ExampleController
     get "/:id", ExampleController, as: :index
@@ -37,7 +49,12 @@ end
 
 class WebSocketApplication < Grip::Application
   def initialize
-    super(environment: "test")
+    super(
+      environment: "test",
+      handlers: [
+        Grip::Handlers::WebSocket.new,
+      ] of HTTP::Handler
+    )
 
     ws "/", MatchController
   end
@@ -47,14 +64,18 @@ class WebSocketApplication < Grip::Application
   end
 end
 
-class ForbiddenController < Grip::Controllers::Exception
+class ForbiddenController
+  include Grip::Controllers::Exception
+
   def call(context : Context) : Context
     context
       .html("403 Error")
   end
 end
 
-class ExampleController < Grip::Controllers::Http
+class ExampleController
+  include Grip::Controllers::HTTP
+
   def index(context : Context) : Context
     context
   end
@@ -76,7 +97,9 @@ class ExampleController < Grip::Controllers::Http
   end
 end
 
-class MatchController < Grip::Controllers::WebSocket
+class MatchController
+  include Grip::Controllers::WebSocket
+
   def on_open(context, socket) : Void
     socket.send("Match")
   end
@@ -97,7 +120,9 @@ class MatchController < Grip::Controllers::WebSocket
   end
 end
 
-class NoMatchController < Grip::Controllers::WebSocket
+class NoMatchController
+  include Grip::Controllers::WebSocket
+
   def on_open(context, socket) : Void
     socket.send("No Match")
   end
@@ -118,7 +143,9 @@ class NoMatchController < Grip::Controllers::WebSocket
   end
 end
 
-class UrlParametersController < Grip::Controllers::WebSocket
+class UrlParametersController
+  include Grip::Controllers::WebSocket
+
   def on_open(context, socket) : Void
     context
       .fetch_path_params
@@ -141,7 +168,9 @@ class UrlParametersController < Grip::Controllers::WebSocket
   end
 end
 
-class BlankController < Grip::Controllers::WebSocket
+class BlankController
+  include Grip::Controllers::WebSocket
+
   def on_open(context : Context, socket : Socket) : Void
   end
 
@@ -164,15 +193,18 @@ end
 def create_ws_request_and_return_io_and_context(handler, request)
   io = IO::Memory.new
   response = HTTP::Server::Response.new(io)
+
   context = HTTP::Server::Context.new(request, response)
   begin
     handler.call context
   rescue IO::Error
     # Raises because the IO::Memory is empty
   end
+
   {% if compare_versions(Crystal::VERSION, "0.35.0-0") >= 0 %}
     response.upgrade_handler.try &.call(io)
   {% end %}
+
   io.rewind
   {io, context}
 end

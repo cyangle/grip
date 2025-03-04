@@ -1,8 +1,8 @@
 require "./spec_helper"
 
-describe "Grip::Routers::Http" do
+describe "Grip::Handlers::HTTP" do
   it "routes" do
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       context.response.print("hello")
       context
@@ -16,7 +16,7 @@ describe "Grip::Routers::Http" do
   it "routes with long response body" do
     long_response_body = "string" * 10_000
 
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       context.response.print(long_response_body)
       context
@@ -28,7 +28,7 @@ describe "Grip::Routers::Http" do
   end
 
   it "routes request with query string" do
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       context.response.print("hello #{context.fetch_query_params.["message"]}")
       context
@@ -39,7 +39,7 @@ describe "Grip::Routers::Http" do
   end
 
   it "routes request with multiple query strings" do
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       context.response.print("hello #{context.fetch_query_params.["message"]} time #{context.fetch_query_params.["time"]}")
       context
@@ -51,7 +51,7 @@ describe "Grip::Routers::Http" do
   end
 
   it "route parameter has more precedence than query string arguments" do
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "GET", "/:message", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       context.response.print("hello #{context.fetch_path_params.["message"]}")
       context
@@ -62,7 +62,7 @@ describe "Grip::Routers::Http" do
   end
 
   it "parses simple JSON body" do
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "POST", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       name = context.fetch_json_params.["name"]
       age = context.fetch_json_params.["age"]
@@ -82,7 +82,7 @@ describe "Grip::Routers::Http" do
   end
 
   it "parses JSON with string array" do
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "POST", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       skills = context.fetch_json_params.["skills"].as(Array)
       context.response.print("Skills #{skills.each.join(',')}")
@@ -101,7 +101,7 @@ describe "Grip::Routers::Http" do
   end
 
   it "parses JSON with json object array" do
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
     http_handler.add_route "POST", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       skills = context.fetch_json_params.["skills"].as(Array)
       skills_from_languages = skills.map(&.["language"])

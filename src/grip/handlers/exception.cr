@@ -1,55 +1,94 @@
 module Grip
   module Handlers
-    # :nodoc:
-    class Exception
-      include HTTP::Handler
+    class Exception < Base
+      alias ExceptionHandler = ::HTTP::Handler
 
-      property handlers : Hash(String, HTTP::Handler)
+      property environment : String = Grip::Application::DEFAULT_ENVIRONMENT
+      property handlers : Hash(String, ExceptionHandler)
 
-      def initialize(@environment : String)
-        @handlers = {} of String => HTTP::Handler
+      def initialize
+        @handlers = Hash(String, ExceptionHandler).new
       end
 
-      def call(context : HTTP::Server::Context)
-        call_next(context)
-      rescue ex
-        return context if context.response.closed?
+      def add_route(
+        verb : String,
+        path : String,
+        handler : ExceptionHandler,
+        via : Symbol | Array(Symbol) | Nil = nil,
+        override : Proc(::HTTP::Server::Context, ::HTTP::Server::Context)? = nil
+      ) : Nil
+      end
 
-        if ex.is_a?(Grip::Exceptions::Base)
-          call_exception(context, ex, ex.status_code.value)
+      def find_route(verb : String, path : String) : Radix::Result(Route)
+        Radix::Result(Route).new
+      end
+
+      def call(context : ::HTTP::Server::Context) : ::HTTP::Server::Context
+        call_next(context) || context
+      rescue ex : ::Exception
+        return context if context.response.closed?
+        handle_exception(context, ex)
+      end
+
+      private def handle_exception(context : ::HTTP::Server::Context, exception : ::Exception) : ::HTTP::Server::Context
+        status_code = determine_status_code(exception, context)
+        process_exception(context, exception, status_code)
+      end
+
+      private def determine_status_code(exception : ::Exception, context : ::HTTP::Server::Context) : Int32
+        case exception
+        when Grip::Exceptions::Base
+          exception.status_code.value
         else
-          call_exception(context, ex, context.response.status_code)
+          context.response.status_code
         end
       end
 
-      private def call_exception(context : HTTP::Server::Context, exception : ::Exception, status_code : Int32)
+      private def process_exception(
+        context : ::HTTP::Server::Context,
+        exception : ::Exception,
+        status_code : Int32
+      ) : ::HTTP::Server::Context
         return context if context.response.closed?
 
-        if @handlers.has_key?(exception.class.name)
-          context.response.status_code = status_code
-          context.exception = exception
-
-          updated_context = @handlers[exception.class.name].call(context)
-          context.response.close
-          updated_context
+        if handler = @handlers[exception.class.name]?
+          execute_custom_handler(context, handler, exception, status_code)
         else
-          if status_code.in?(400..599)
-            context.response.status_code = status_code
-          else
-            context.response.status_code = 500
-          end
+          render_default_error(context, exception, status_code)
+        end
+      end
 
+      private def execute_custom_handler(
+        context : ::HTTP::Server::Context,
+        handler : ExceptionHandler,
+        exception : ::Exception,
+        status_code : Int32
+      ) : ::HTTP::Server::Context
+        context.response.status_code = status_code
+        context.exception = exception
+
+        updated_context = handler.call(context)
+        context.response.close
+
+        updated_context || context
+      end
+
+      private def render_default_error(
+        context : ::HTTP::Server::Context,
+        exception : ::Exception,
+        status_code : Int32
+      ) : ::HTTP::Server::Context
+        if environment == "development"
+          context.response.status_code = status_code.clamp(400, 599)
           context.response.headers.merge!({"Content-Type" => "text/html; charset=UTF-8"})
-
-          if @environment == "production"
-            context.response.print("An error occured, please try again later.")
-          else
-            context.response.print(Grip::Minuscule::ExceptionPage.new(context, exception))
-          end
-
-          context.response.close
-          context
+          context.response.print(Grip::Minuscule::ExceptionPage.new(context, exception))
+        else
+          context.response.status_code = 500
+          context.response.print("500 Internal Server Error")
         end
+
+        context.response.close
+        context
       end
     end
   end

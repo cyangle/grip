@@ -1,9 +1,9 @@
 require "./spec_helper"
 
-describe "Grip::Routers::WebSocket" do
+describe "Grip::Handlers::WebSocket" do
   it "doesn't match on wrong route" do
-    handler = Grip::Routers::WebSocket.new
-    handler.next = Grip::Routers::Http.new
+    handler = Grip::Handlers::WebSocket.new
+    handler.next = Grip::Handlers::HTTP.new
     headers = HTTP::Headers{
       "Upgrade"           => "websocket",
       "Connection"        => "Upgrade",
@@ -20,7 +20,7 @@ describe "Grip::Routers::WebSocket" do
   end
 
   it "matches on given route" do
-    handler = Grip::Routers::WebSocket.new
+    handler = Grip::Handlers::WebSocket.new
     handler.add_route "", "/", MatchController.new, [:none], nil
     handler.add_route "", "/no_match", NoMatchController.new, [:none], nil
     headers = HTTP::Headers{
@@ -32,11 +32,11 @@ describe "Grip::Routers::WebSocket" do
     request = HTTP::Request.new("GET", "/", headers)
 
     io_with_context = create_ws_request_and_return_io_and_context(handler, request)[0]
-    io_with_context.to_s.should eq("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n\x81\u0005Match")
+    io_with_context.to_s.should eq("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n")
   end
 
   it "fetches named url parameters" do
-    handler = Grip::Routers::WebSocket.new
+    handler = Grip::Handlers::WebSocket.new
     handler.add_route "", "/:id", UrlParametersController.new, [:none], nil
     headers = HTTP::Headers{
       "Upgrade"               => "websocket",
@@ -50,8 +50,8 @@ describe "Grip::Routers::WebSocket" do
   end
 
   it "matches correct verb" do
-    grip = Grip::Routers::Http.new
-    handler = Grip::Routers::WebSocket.new
+    grip = Grip::Handlers::HTTP.new
+    handler = Grip::Handlers::WebSocket.new
     handler.next = grip
 
     handler.add_route "", "/", BlankController.new, [:none], nil

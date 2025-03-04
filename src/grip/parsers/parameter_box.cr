@@ -1,8 +1,5 @@
 module Grip
   module Parsers
-    # Parses the request contents including query_params and body
-    # and converts them into a params hash which you can use within
-    # the environment context.
     class ParameterBox
       URL_ENCODED_FORM = "application/x-www-form-urlencoded"
       APPLICATION_JSON = "application/json"
@@ -90,7 +87,8 @@ module Grip
       private def parse_json
         return unless @request.body && @request.headers["Content-Type"]?.try(&.starts_with?(APPLICATION_JSON))
 
-        body = @request.body.not_nil!.gets_to_end
+        body = @request.body.try(&.gets_to_end) || String.new
+
         case json = JSON.parse(body).raw
         when Hash
           json.each do |key, value|

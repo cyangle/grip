@@ -6,7 +6,7 @@ describe "Grip::Handlers::Exception" do
     io = IO::Memory.new
     response = HTTP::Server::Response.new(io)
     context = HTTP::Server::Context.new(request, response)
-    Grip::Handlers::Exception.new(environment: "test").call(context)
+    Grip::Handlers::Exception.new.call(context)
     response.close
     io.rewind
     response = HTTP::Client::Response.from_io(io, decompress: false)
@@ -14,9 +14,9 @@ describe "Grip::Handlers::Exception" do
   end
 
   it "renders custom error" do
-    error_handler = Grip::Handlers::Exception.new(environment: "test")
+    error_handler = Grip::Handlers::Exception.new
     error_handler.handlers[Exceptions::Forbidden.name] = ForbiddenController.new
-    http_handler = Grip::Routers::Http.new
+    http_handler = Grip::Handlers::HTTP.new
 
     http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
       raise Exceptions::Forbidden.new

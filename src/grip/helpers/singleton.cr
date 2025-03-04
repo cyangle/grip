@@ -2,12 +2,10 @@ module Grip
   module Helpers
     module Singleton
       macro included
-        macro inherited
-          @@instance = new
+        @@instance = new
 
-          def self.instance
-            @@instance
-          end
+        def self.instance
+          @@instance
         end
       end
     end

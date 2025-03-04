@@ -1,13 +1,15 @@
 module Grip
   module Controllers
-    class Exception
-      alias Context = HTTP::Server::Context
+    module Exception
+      macro included
+        alias Context = ::HTTP::Server::Context
 
-      include HTTP::Handler
-      include Helpers::Singleton
+        include ::HTTP::Handler
+        include Grip::Helpers::Singleton
 
-      def call(context : Context) : Context
-        context.html(context.exception)
+        def call(context : Context) : Context
+          context.html(context.exception)
+        end
       end
     end
   end

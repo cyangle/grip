@@ -3,7 +3,7 @@ require "./spec_helper"
 describe "Context" do
   context "headers" do
     it "sets content type" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/content_type", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.response.headers.merge!({"Content-Type" => "application/json"})
         context
@@ -15,7 +15,7 @@ describe "Context" do
     end
 
     it "parses headers" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/headers", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         name = context.request.headers["name"]
         context.response.print("Hello #{name}")
@@ -30,7 +30,7 @@ describe "Context" do
     end
 
     it "sets response headers" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/response_headers", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.response.headers.add "Accept-Language", "ge"
         context
@@ -45,7 +45,7 @@ describe "Context" do
   context "methods" do
     it "sends a local file" do
       file_path = File.join(__DIR__, "./fixtures/index.html")
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.send_file(file_path).halt
       end
@@ -57,9 +57,9 @@ describe "Context" do
     end
 
     it "has binary() method with octet-stream" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
-        context.binary(10).halt
+        context.binary("10").halt
       end
 
       request = HTTP::Request.new("GET", "/")
@@ -69,7 +69,7 @@ describe "Context" do
     end
 
     it "encodes text in utf-8" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.text("👋🏼 grip").halt
       end
@@ -81,7 +81,7 @@ describe "Context" do
     end
 
     it "encodes html in utf-8" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.html("👋🏼 grip").halt
       end
@@ -95,7 +95,7 @@ describe "Context" do
 
   context "methods" do
     it "allows overriding text() content type" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.text("👋🏼 grip", "text/html").halt
       end
@@ -106,7 +106,7 @@ describe "Context" do
     end
 
     it "allows overriding json() content type" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.json({:message => "👋🏼 grip"}, "application/json").halt
       end
@@ -117,7 +117,7 @@ describe "Context" do
     end
 
     it "allows overriding html() content type" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.html("👋🏼 grip", "text/html").halt
       end
@@ -128,9 +128,9 @@ describe "Context" do
     end
 
     it "allows overriding binary() content type" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
-        context.binary(10, "multipart/encrypted").halt
+        context.binary("10", "multipart/encrypted").halt
       end
 
       request = HTTP::Request.new("GET", "/")
@@ -141,7 +141,7 @@ describe "Context" do
 
   context "cookies" do
     it "sets cookie" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/cookies", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.put_resp_cookie(HTTP::Cookie.new("Foo", "Bar")).halt
       end
@@ -154,7 +154,7 @@ describe "Context" do
     end
 
     it "sets string cookie" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/cookies", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.put_resp_cookie("Foo", "Bar").halt
       end
@@ -167,7 +167,7 @@ describe "Context" do
     end
 
     it "sets multiple cookie" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/cookies", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.put_resp_cookie("Foo", "Bar").put_resp_cookie("Qux", "Baz").halt
       end
@@ -181,7 +181,7 @@ describe "Context" do
     end
 
     it "overrides cookie" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/cookies", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.put_resp_cookie("Foo", "Bar").put_resp_cookie("Foo", "Baz").halt
       end
@@ -194,7 +194,7 @@ describe "Context" do
     end
 
     it "gets correkt cookie" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/get_cookie", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         cookie = context.get_req_cookie("Foo")
         if cookie
@@ -213,7 +213,7 @@ describe "Context" do
     end
 
     it "gets nil for not existing cookie" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/get_cookie", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         cookie = context.get_req_cookie("Baz")
         if cookie
@@ -235,7 +235,7 @@ describe "Context" do
 
   context "redirects" do
     it "redirects to home page when called without arguments" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/redirect_to_home", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.redirect
       end
@@ -248,7 +248,7 @@ describe "Context" do
     end
 
     it "redirects to another url with status code 301 using keyword arguments" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/redirect_to_another_url", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.redirect(url: "/another_url", status_code: 301)
       end
@@ -261,7 +261,7 @@ describe "Context" do
     end
 
     it "redirects to another url with status code 308 using positional arguments" do
-      http_handler = Grip::Routers::Http.new
+      http_handler = Grip::Handlers::HTTP.new
       http_handler.add_route "GET", "/redirect_to_another_url_with_308", ExampleController.new, [:none], ->(context : HTTP::Server::Context) do
         context.redirect("/another_url", HTTP::Status::PERMANENT_REDIRECT)
       end
