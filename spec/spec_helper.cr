@@ -12,55 +12,52 @@ class ErrorController
   end
 end
 
-class ErrorApplication < Grip::Application
+class ErrorApplication
+  include Grip::Application
+
+  property handlers : Array(HTTP::Handler) = [
+    Grip::Handlers::Exception.new
+  ] of HTTP::Handler
+
+  property environment : String = "test"
+  property host : String = "0.0.0.0"
+  property port : Int32 = 0
+
   def initialize
-    super(
-      environment: "test",
-      handlers: [
-        Grip::Handlers::Exception.new,
-      ] of HTTP::Handler
-    )
-
     exception Grip::Exceptions::NotFound, ErrorController
-  end
-
-  def port
-    0
   end
 end
 
-class HttpApplication < Grip::Application
-  def initialize
-    super(
-      environment: "test",
-      handlers: [
-        Grip::Handlers::HTTP.new,
-      ] of HTTP::Handler
-    )
+class HttpApplication
+  include Grip::Application
 
+  property handlers : Array(HTTP::Handler) = [
+    Grip::Handlers::HTTP.new
+  ] of HTTP::Handler
+
+  property environment : String = "test"
+  property host : String = "0.0.0.0"
+  property port : Int32 = 0
+
+  def initialize
     get "/", ExampleController
     get "/:id", ExampleController, as: :index
   end
-
-  def port
-    0
-  end
 end
 
-class WebSocketApplication < Grip::Application
+class WebSocketApplication
+  include Grip::Application
+
+  property handlers : Array(HTTP::Handler) = [
+    Grip::Handlers::WebSocket.new
+  ] of HTTP::Handler
+
+  property environment : String = "test"
+  property host : String = "0.0.0.0"
+  property port : Int32 = 0
+
   def initialize
-    super(
-      environment: "test",
-      handlers: [
-        Grip::Handlers::WebSocket.new,
-      ] of HTTP::Handler
-    )
-
     ws "/", MatchController
-  end
-
-  def port
-    0
   end
 end
 

@@ -3,7 +3,6 @@ module Grip
     class Exception < Base
       alias ExceptionHandler = ::HTTP::Handler
 
-      property environment : String = Grip::Application::DEFAULT_ENVIRONMENT
       property handlers : Hash(String, ExceptionHandler)
 
       def initialize
@@ -78,14 +77,9 @@ module Grip
         exception : ::Exception,
         status_code : Int32
       ) : ::HTTP::Server::Context
-        if environment == "development"
-          context.response.status_code = status_code.clamp(400, 599)
-          context.response.headers.merge!({"Content-Type" => "text/html; charset=UTF-8"})
-          context.response.print(Grip::Minuscule::ExceptionPage.new(context, exception))
-        else
-          context.response.status_code = 500
-          context.response.print("500 Internal Server Error")
-        end
+        context.response.status_code = status_code.clamp(400, 599)
+        context.response.headers.merge!({"Content-Type" => "text/html; charset=UTF-8"})
+        context.response.print(Grip::Minuscule::ExceptionPage.new(context, exception))
 
         context.response.close
         context

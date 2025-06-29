@@ -69,21 +69,21 @@ class IndexController
   end
 end
 
-class Application < Grip::Application
+class Application
+  include Grip::Application
+
   def initialize
+    # You can include as many handlers as you want,
+    # for now we will just log the requests and provide an HTTP handler.
+    property handlers : Array(HTTP::Handler) = [
+      Grip::Handlers::Log.new,
+      Grip::Handlers::HTTP.new
+    ] of HTTP::Handler
+
     # By default the environment is set to "development".
-    super(
-      environment: ENV["ENVIRONMENT"]? || "production"
-      handlers: [
-        Grip::Handlers::Log.new,
-        Grip::Handlers::HTTP.new
-      ] of HTTP::Handler
-    )
+    property environment : String = 
+      ENV["ENVIRONMENT"]? || "production"
 
-    routes()
-  end
-
-  def routes()
     scope "/api" do
       scope "/v1" do
         get "/", IndexController
