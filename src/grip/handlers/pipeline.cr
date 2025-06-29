@@ -11,7 +11,7 @@ module Grip
         @http_handler = nil,
         @websocket_handler = nil
       )
-        @pipeline = Hash(Symbol, Middleware::Base).new
+        @pipeline = Hash(Symbol, Array(Middleware::Base)).new
       end
 
       def add_route(
