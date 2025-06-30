@@ -1,9 +1,11 @@
 module Grip
   module Exceptions
     class Unauthorized < Base
-      def initialize
+      def initialize(message : String? = nil)
         @status_code = HTTP::Status::UNAUTHORIZED
-        super "You are not authorized to access this endpoint."
+
+        super message if message
+        super "You are not authorized to access this endpoint." unless message
       end
     end
   end
