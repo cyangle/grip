@@ -3,8 +3,7 @@ module Grip
     class Generic < Base
       def initialize
         @status_code = HTTP::Status::SERVICE_UNAVAILABLE
-
-        super "Something went wrong, please try again."
+        @message = "Something went wrong, please try again."
       end
     end
   end

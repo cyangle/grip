@@ -1,10 +1,9 @@
 module Grip
   module Exceptions
-    abstract class Base < Exception
-      getter status_code : HTTP::Status
+    class Base < Exception
+      getter status_code : HTTP::Status = HTTP::Status::IM_A_TEAPOT
 
-      def initialize(@message : String)
-        @status_code = HTTP::Status::IM_A_TEAPOT
+      def initialize(@status_code : HTTP::Status, @message : String)
       end
     end
   end
