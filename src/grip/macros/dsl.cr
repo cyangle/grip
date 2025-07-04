@@ -12,6 +12,14 @@ module Grip
         end
       end
 
+      macro scope
+        %size = @valves.size
+
+        {{yield}}
+
+        @valves.pop(@valves.size - %size)
+      end
+
       macro scope(path)
         %size = @valves.size
 
