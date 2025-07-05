@@ -51,6 +51,18 @@ module Grip
 
       # Server setup and running
       def server : HTTP::Server
+        http_handler = @handlers.find &.is_a?(Grip::Handlers::HTTP)
+        websocket_handler = @handlers.find &.is_a?(Grip::Handlers::WebSocket)
+
+        if http_handler && websocket_handler
+          http_index = @handlers.index(http_handler)
+          ws_index = @handlers.index(websocket_handler)
+
+          if http_index && ws_index && http_index < ws_index
+            raise Exception.new("WebSocket handler must precede HTTP handler to resolve WebSocket routes")
+          end
+        end
+
         HTTP::Server.new(@handlers)
       end
 
