@@ -71,8 +71,8 @@ module Grip
         bind_server(server_instance)
 
         Log.info { "Listening at #{scheme}://#{host}:#{port}" }
-        setup_signal_handling unless environment == "test"
-        server_instance.listen unless environment == "test"
+        setup_signal_handling unless environment == "TEST"
+        server_instance.listen unless environment == "TEST"
       end
 
       private def bind_server(server : HTTP::Server)
