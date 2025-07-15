@@ -1,9 +1,9 @@
 module Grip
   module Handlers
     class Pipeline < Base
-      CACHED_PIPES = {} of Array(Symbol) => Array(Middleware::Base)
+      CACHED_PIPES = {} of Array(Symbol) => Array(::HTTP::Handler)
 
-      property pipeline : Hash(Symbol, Array(Middleware::Base))
+      property pipeline : Hash(Symbol, Array(::HTTP::Handler))
       property http_handler : ::HTTP::Handler?
       property websocket_handler : ::HTTP::Handler?
 
@@ -11,7 +11,7 @@ module Grip
         @http_handler = nil,
         @websocket_handler = nil,
       )
-        @pipeline = Hash(Symbol, Array(Middleware::Base)).new
+        @pipeline = Hash(Symbol, Array(HTTP::Handler)).new
       end
 
       def add_route(
@@ -44,19 +44,19 @@ module Grip
         @http_handler = http_handler
         @websocket_handler = websocket_handler
 
-        handlers = @pipeline[valve] ||= Array(Middleware::Base).new
+        handlers = @pipeline[valve] ||= Array(::HTTP::Handler).new
         handlers << pipe
         handlers[-2]?.try &.next = pipe
       end
 
-      def get(valve : Symbol) : Array(Middleware::Base)?
+      def get(valve : Symbol) : Array(::HTTP::Handler)?
         @pipeline[valve]?
       end
 
-      def get(valves : Array(Symbol)) : Array(Middleware::Base)
+      def get(valves : Array(Symbol)) : Array(::HTTP::Handler)
         return CACHED_PIPES[valves] if CACHED_PIPES.has_key?(valves)
 
-        pipes = Array(Middleware::Base).new
+        pipes = Array(::HTTP::Handler).new
 
         valves.each do |valve|
           @pipeline[valve]?.try &.each { |pipe| pipes << pipe }

@@ -1,7 +1,7 @@
 module Grip
   module Middleware
     class ClientIP
-      include Base
+      include HTTP::Handler
 
       def initialize(header : String = "X-Forwarded-For")
         @headers = [header]
