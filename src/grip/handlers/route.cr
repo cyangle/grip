@@ -12,14 +12,14 @@ module Grip
         @path : String,
         @handler : ::HTTP::Handler,
         via : Symbol | Array(Symbol) | Nil = nil,
-        @override : Proc(::HTTP::Server::Context, ::HTTP::Server::Context)? = nil
+        @override : Proc(::HTTP::Server::Context, ::HTTP::Server::Context)? = nil,
       )
         @via = normalize_via(via)
       end
 
       def process_pipeline(
         context : ::HTTP::Server::Context,
-        pipeline_handler : Grip::Handlers::Pipeline
+        pipeline_handler : Grip::Handlers::Pipeline,
       ) : ::HTTP::Server::Context
         execute_pipeline(context, pipeline_handler)
         context
@@ -43,7 +43,7 @@ module Grip
 
       private def execute_pipeline(
         context : ::HTTP::Server::Context,
-        pipeline_handler : Grip::Handlers::Pipeline
+        pipeline_handler : Grip::Handlers::Pipeline,
       ) : Nil
         pipeline_handler.get(@via).each(&.call(context))
       end

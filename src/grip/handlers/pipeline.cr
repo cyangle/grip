@@ -9,7 +9,7 @@ module Grip
 
       def initialize(
         @http_handler = nil,
-        @websocket_handler = nil
+        @websocket_handler = nil,
       )
         @pipeline = Hash(Symbol, Array(Middleware::Base)).new
       end
@@ -19,7 +19,7 @@ module Grip
         path : String,
         handler : ::HTTP::Handler,
         via : Symbol? | Array(Symbol)? = nil,
-        override : Proc(::HTTP::Server::Context, ::HTTP::Server::Context)? = nil
+        override : Proc(::HTTP::Server::Context, ::HTTP::Server::Context)? = nil,
       ) : Nil
       end
 
@@ -39,7 +39,7 @@ module Grip
         valve : Symbol,
         pipe : ::HTTP::Handler,
         http_handler : ::HTTP::Handler? = nil,
-        websocket_handler : ::HTTP::Handler? = nil
+        websocket_handler : ::HTTP::Handler? = nil,
       ) : Nil
         @http_handler = http_handler
         @websocket_handler = websocket_handler

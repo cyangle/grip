@@ -1,6 +1,6 @@
 module Grip
   module Exceptions
-    class Forbidden < Base      
+    class Forbidden < Base
       def initialize(message : String? = nil)
         @status_code = HTTP::Status::FORBIDDEN
         @message = message if message

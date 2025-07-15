@@ -2,7 +2,7 @@ module Grip
   module Middleware
     class ClientIP
       include Base
-      
+
       def initialize(header : String = "X-Forwarded-For")
         @headers = [header]
       end

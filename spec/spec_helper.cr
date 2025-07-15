@@ -16,7 +16,7 @@ class ErrorApplication
   include Grip::Application
 
   property handlers : Array(HTTP::Handler) = [
-    Grip::Handlers::Exception.new
+    Grip::Handlers::Exception.new,
   ] of HTTP::Handler
 
   property environment : String = "test"
@@ -32,7 +32,7 @@ class HttpApplication
   include Grip::Application
 
   property handlers : Array(HTTP::Handler) = [
-    Grip::Handlers::HTTP.new
+    Grip::Handlers::HTTP.new,
   ] of HTTP::Handler
 
   property environment : String = "test"
@@ -49,7 +49,7 @@ class WebSocketApplication
   include Grip::Application
 
   property handlers : Array(HTTP::Handler) = [
-    Grip::Handlers::WebSocket.new
+    Grip::Handlers::WebSocket.new,
   ] of HTTP::Handler
 
   property environment : String = "test"
