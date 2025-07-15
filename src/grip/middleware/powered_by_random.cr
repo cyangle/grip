@@ -1,6 +1,6 @@
 module Grip
   module Middleware
-    class PoweredByGrip
+    class PoweredByRandom
       include HTTP::Handler
 
       property application : String
