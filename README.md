@@ -80,9 +80,9 @@ class Application
       Grip::Handlers::HTTP.new
     ] of HTTP::Handler
 
-    # By default the environment is set to "development".
+    # By default the environment is set to "DEVELOPMENT".
     property environment : String = 
-      ENV["ENVIRONMENT"]? || "production"
+      ENV["ENVIRONMENT"]? || "PRODUCTION"
 
     scope "/api" do
       scope "/v1" do
