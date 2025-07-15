@@ -22,4 +22,4 @@ jobs:
       - name: Static analysis
         run: ./bin/ameba
       - name: Run tests
-        run: crystal spec
+        run: ENVIRONMENT=TEST crystal spec --verbose

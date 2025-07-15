@@ -5,10 +5,10 @@ module Grip
     macro included
       include Grip::Macros::Dsl
 
-      DEFAULT_HOST        = "0.0.0.0"
-      DEFAULT_PORT        = 4004
-      DEFAULT_ENVIRONMENT = "development"
-      DEFAULT_REUSE_PORT  = false
+      DEFAULT_HOST        = ENV["HOST"]? || "0.0.0.0"
+      DEFAULT_PORT        = (ENV["PORT"]? || "4004").to_i
+      DEFAULT_ENVIRONMENT = ENV["ENVIRONMENT"]?.try(&.upcase) || "DEVELOPMENT"
+      DEFAULT_REUSE_PORT = ENV["REUSE_PORT"]?.try(&.downcase) == "true" || false
 
       property environment : String = DEFAULT_ENVIRONMENT
       property host : String = DEFAULT_HOST

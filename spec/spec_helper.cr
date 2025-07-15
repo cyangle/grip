@@ -19,7 +19,6 @@ class ErrorApplication
     Grip::Handlers::Exception.new,
   ] of HTTP::Handler
 
-  property environment : String = "test"
   property host : String = "0.0.0.0"
   property port : Int32 = 0
 
@@ -35,7 +34,6 @@ class HttpApplication
     Grip::Handlers::HTTP.new,
   ] of HTTP::Handler
 
-  property environment : String = "test"
   property host : String = "0.0.0.0"
   property port : Int32 = 0
 
@@ -52,7 +50,6 @@ class WebSocketApplication
     Grip::Handlers::WebSocket.new,
   ] of HTTP::Handler
 
-  property environment : String = "test"
   property host : String = "0.0.0.0"
   property port : Int32 = 0
 
