@@ -72,18 +72,18 @@ end
 class Application
   include Grip::Application
 
+  # You can include as many handlers as you want,
+  # for now we will just log the requests and provide an HTTP handler.
+  property handlers : Array(HTTP::Handler) = [
+    Grip::Handlers::Log.new,
+    Grip::Handlers::HTTP.new
+  ] of HTTP::Handler
+
+  # By default the environment is set to "DEVELOPMENT".
+  property environment : String = 
+    ENV["ENVIRONMENT"]? || "PRODUCTION"
+
   def initialize
-    # You can include as many handlers as you want,
-    # for now we will just log the requests and provide an HTTP handler.
-    property handlers : Array(HTTP::Handler) = [
-      Grip::Handlers::Log.new,
-      Grip::Handlers::HTTP.new
-    ] of HTTP::Handler
-
-    # By default the environment is set to "DEVELOPMENT".
-    property environment : String = 
-      ENV["ENVIRONMENT"]? || "PRODUCTION"
-
     scope "/api" do
       scope "/v1" do
         get "/", IndexController
