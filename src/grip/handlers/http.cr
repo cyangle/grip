@@ -28,7 +28,7 @@ module Grip
         override : Proc(::HTTP::Server::Context, ::HTTP::Server::Context)? = nil,
       ) : Nil
         route = Route.new(verb, path, handler, via, override)
-        
+
         @has_all_routes = true if verb == "ALL"
         @routes.add(radix_path(verb, path), route)
       end

@@ -83,7 +83,7 @@ module Grip
           return entry[1] if entry[0] == hash && entry[1]
           break if entry[0] == 0_u64 && i > 0
         end
-        
+
         nil
       end
 
