@@ -4,109 +4,209 @@ module Grip
       URL_ENCODED_FORM = "application/x-www-form-urlencoded"
       APPLICATION_JSON = "application/json"
       MULTIPART_FORM   = "multipart/form-data"
-      PARTS            = %w(url query body json file)
-      # :nodoc:
+
       alias AllParamTypes = Nil | String | Int64 | Float64 | Bool | Hash(String, JSON::Any) | Array(JSON::Any)
-      getter file
 
-      def initialize(@request : HTTP::Request, @url : Hash(String, String) = {} of String => String)
-        @query = HTTP::Params.new({} of String => Array(String))
-        @body = HTTP::Params.new({} of String => Array(String))
-        @json = {} of String => AllParamTypes
-        @file = {} of String => FileUpload
-        @url_parsed = false
-        @query_parsed = false
-        @body_parsed = false
-        @json_parsed = false
-        @file_parsed = false
+      # Use class-level empty instances to avoid allocations
+      EMPTY_STRING_HASH = {} of String => String
+      EMPTY_PARAMS      = HTTP::Params.new({} of String => Array(String))
+      EMPTY_JSON        = {} of String => AllParamTypes
+      EMPTY_FILE        = {} of String => FileUpload
+
+      @url : Hash(String, String)
+      @query : HTTP::Params?
+      @body : HTTP::Params?
+      @json : Hash(String, AllParamTypes)?
+      @file : Hash(String, FileUpload)?
+      @request : HTTP::Request
+
+      # Flags packed into single byte for cache efficiency
+      @parsed_flags : UInt8 = 0_u8
+
+      FLAG_URL   = 0x01_u8
+      FLAG_QUERY = 0x02_u8
+      FLAG_BODY  = 0x04_u8
+      FLAG_JSON  = 0x08_u8
+      FLAG_FILE  = 0x10_u8
+
+      def initialize(@request : HTTP::Request, @url : Hash(String, String) = EMPTY_STRING_HASH)
       end
 
-      private def unescape_url_param(value : String)
-        value.empty? ? value : URI.decode(value)
-      rescue
-        value
+      @[AlwaysInline]
+      private def parsed?(flag : UInt8) : Bool
+        (@parsed_flags & flag) != 0
       end
 
-      {% for method in PARTS %}
-        def {{method.id}}
-          # check memoization
-          return @{{method.id}} if @{{method.id}}_parsed
+      @[AlwaysInline]
+      private def mark_parsed(flag : UInt8) : Nil
+        @parsed_flags |= flag
+      end
 
-          parse_{{method.id}}
-          # memoize
-          @{{method.id}}_parsed = true
-          @{{method.id}}
+      # URL params - most frequently accessed, optimize heavily
+      @[AlwaysInline]
+      def url : Hash(String, String)
+        return @url if parsed?(FLAG_URL)
+        parse_url
+        mark_parsed(FLAG_URL)
+        @url
+      end
+
+      @[AlwaysInline]
+      def query : HTTP::Params
+        return @query.not_nil! if parsed?(FLAG_QUERY)
+        parse_query
+        mark_parsed(FLAG_QUERY)
+        @query.not_nil!
+      end
+
+      def body : HTTP::Params
+        return @body.not_nil! if parsed?(FLAG_BODY)
+        parse_body
+        mark_parsed(FLAG_BODY)
+        @body || EMPTY_PARAMS
+      end
+
+      def json : Hash(String, AllParamTypes)
+        return @json.not_nil! if parsed?(FLAG_JSON)
+        parse_json
+        mark_parsed(FLAG_JSON)
+        @json || EMPTY_JSON
+      end
+
+      def file : Hash(String, FileUpload)
+        return @file.not_nil! if parsed?(FLAG_FILE)
+        parse_file
+        mark_parsed(FLAG_FILE)
+        @file || EMPTY_FILE
+      end
+
+      @[AlwaysInline]
+      private def unescape_url_param(value : String) : String
+        return value if value.empty?
+
+        # Fast path: check if decoding is needed at all
+        needs_decode = false
+        value.each_byte do |byte|
+          if byte === '%' || byte === '+'
+            needs_decode = true
+            break
+          end
         end
-      {% end %}
 
-      private def parse_body
+        return value unless needs_decode
+        URI.decode(value) rescue value
+      end
+
+      private def parse_url : Nil
+        return if @url.empty?
+
+        @url.each_key do |key|
+          value = @url[key]
+          decoded = unescape_url_param(value)
+          @url[key] = decoded if decoded != value
+        end
+      end
+
+      private def parse_query : Nil
+        query_string = @request.query
+        @query = if query_string && !query_string.empty?
+                   HTTP::Params.parse(query_string)
+                 else
+                   EMPTY_PARAMS
+                 end
+      end
+
+      private def parse_body : Nil
         content_type = @request.headers["Content-Type"]?
 
-        return unless content_type
-
-        if content_type.try(&.starts_with?(URL_ENCODED_FORM))
-          @body = parse_part(@request.body)
+        unless content_type
+          @body = EMPTY_PARAMS
           return
         end
 
-        if content_type.try(&.starts_with?(MULTIPART_FORM))
+        # Avoid starts_with? which creates substrings - use byte comparison
+        if content_type_matches?(content_type, URL_ENCODED_FORM)
+          @body = parse_part(@request.body)
+        elsif content_type_matches?(content_type, MULTIPART_FORM)
+          @body = EMPTY_PARAMS
           parse_file
+        else
+          @body = EMPTY_PARAMS
         end
       end
 
-      private def parse_query
-        @query = parse_part(@request.query)
+      @[AlwaysInline]
+      private def content_type_matches?(content_type : String, expected : String) : Bool
+        return false if content_type.bytesize < expected.bytesize
+
+        expected.bytesize.times do |i|
+          return false if content_type.byte_at(i) != expected.byte_at(i)
+        end
+        true
       end
 
-      private def parse_url
-        @url.each { |key, value| @url[key] = unescape_url_param(value) }
-      end
+      private def parse_file : Nil
+        return if parsed?(FLAG_FILE)
 
-      private def parse_file
-        return if @file_parsed
+        @file = {} of String => FileUpload
 
         HTTP::FormData.parse(@request) do |upload|
           next unless upload
 
-          filename = upload.filename
-
-          if !filename.nil?
-            @file[upload.name] = FileUpload.new(upload)
+          if filename = upload.filename
+            @file.not_nil![upload.name] = FileUpload.new(upload)
           else
-            @body.add(upload.name, upload.body.gets_to_end)
+            @body ||= HTTP::Params.new({} of String => Array(String))
+            @body.not_nil!.add(upload.name, upload.body.gets_to_end)
           end
         end
 
-        @file_parsed = true
+        mark_parsed(FLAG_FILE)
       end
 
-      # Parses JSON request body if Content-Type is `application/json`.
-      #
-      # - If request body is a JSON `Hash` then all the params are parsed and added into `params`.
-      # - If request body is a JSON `Array` it's added into `params` as `_json` and can be accessed like `params["_json"]`.
-      private def parse_json
-        return unless @request.body && @request.headers["Content-Type"]?.try(&.starts_with?(APPLICATION_JSON))
+      private def parse_json : Nil
+        body_io = @request.body
+        content_type = @request.headers["Content-Type"]?
 
-        body = @request.body.try(&.gets_to_end) || String.new
+        unless body_io && content_type && content_type_matches?(content_type, APPLICATION_JSON)
+          @json = EMPTY_JSON
+          return
+        end
 
-        case json = JSON.parse(body).raw
+        body_str = body_io.gets_to_end
+
+        if body_str.empty?
+          @json = EMPTY_JSON
+          return
+        end
+
+        @json = {} of String => AllParamTypes
+
+        case json = JSON.parse(body_str).raw
         when Hash
           json.each do |key, value|
-            @json[key] = value.raw
+            @json.not_nil![key] = value.raw
           end
         when Array
-          @json["_json"] = json
+          @json.not_nil!["_json"] = json
+        end
+      rescue JSON::ParseException
+        @json = EMPTY_JSON
+      end
+
+      @[AlwaysInline]
+      private def parse_part(part : IO?) : HTTP::Params
+        if part
+          content = part.gets_to_end
+          content.empty? ? EMPTY_PARAMS : HTTP::Params.parse(content)
         else
-          # Ignore non Array or Hash json values
+          EMPTY_PARAMS
         end
       end
 
-      private def parse_part(part : IO?)
-        HTTP::Params.parse(part ? part.gets_to_end : "")
-      end
-
-      private def parse_part(part : String?)
-        HTTP::Params.parse part.to_s
+      @[AlwaysInline]
+      private def parse_part(part : String?) : HTTP::Params
+        part && !part.empty? ? HTTP::Params.parse(part) : EMPTY_PARAMS
       end
     end
   end

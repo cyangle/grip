@@ -3,6 +3,9 @@ module Grip
     class Exception < Base
       alias ExceptionHandler = ::HTTP::Handler
 
+      # Pre-allocated header for default error response
+      CONTENT_TYPE_HTML = {"Content-Type" => "text/html; charset=UTF-8"}
+
       property handlers : Hash(String, ExceptionHandler)
 
       def initialize
@@ -22,6 +25,7 @@ module Grip
         Radix::Result(Route).new
       end
 
+      @[AlwaysInline]
       def call(context : ::HTTP::Server::Context) : ::HTTP::Server::Context
         call_next(context) || context
       rescue ex : ::Exception
@@ -29,26 +33,15 @@ module Grip
         handle_exception(context, ex)
       end
 
+      @[AlwaysInline]
       private def handle_exception(context : ::HTTP::Server::Context, exception : ::Exception) : ::HTTP::Server::Context
-        status_code = determine_status_code(exception, context)
-        process_exception(context, exception, status_code)
-      end
-
-      private def determine_status_code(exception : ::Exception, context : ::HTTP::Server::Context) : Int32
-        case exception
-        when Grip::Exceptions::Base
-          exception.status_code.value
-        else
-          context.response.status_code
-        end
-      end
-
-      private def process_exception(
-        context : ::HTTP::Server::Context,
-        exception : ::Exception,
-        status_code : Int32,
-      ) : ::HTTP::Server::Context
         return context if context.response.closed?
+
+        status_code = if exception.is_a?(Grip::Exceptions::Base)
+                        exception.status_code.value
+                      else
+                        context.response.status_code
+                      end
 
         if handler = @handlers[exception.class.name]?
           execute_custom_handler(context, handler, exception, status_code)
@@ -57,6 +50,7 @@ module Grip
         end
       end
 
+      @[AlwaysInline]
       private def execute_custom_handler(
         context : ::HTTP::Server::Context,
         handler : ExceptionHandler,
@@ -66,22 +60,25 @@ module Grip
         context.response.status_code = status_code
         context.exception = exception
 
-        updated_context = handler.call(context)
+        handler.call(context)
         context.response.close
-
-        updated_context || context
+        context
       end
 
+      @[AlwaysInline]
       private def render_default_error(
         context : ::HTTP::Server::Context,
         exception : ::Exception,
         status_code : Int32,
       ) : ::HTTP::Server::Context
-        context.response.status_code = status_code.clamp(400, 599)
-        context.response.headers.merge!({"Content-Type" => "text/html; charset=UTF-8"})
-        context.response.print(Grip::Minuscule::ExceptionPage.new(context, exception))
+        response = context.response
 
-        context.response.close
+        # Clamp status code to valid error range
+        response.status_code = status_code.clamp(400, 599)
+        response.headers.merge!(CONTENT_TYPE_HTML)
+        response.print(Grip::Minuscule::ExceptionPage.new(context, exception))
+        response.close
+
         context
       end
     end
