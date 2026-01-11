@@ -1,7 +1,8 @@
 module Grip
   module Handlers
     class Pipeline < Base
-      CACHED_PIPES = {} of Array(Symbol) => Array(::HTTP::Handler)
+      # Use instance cache instead of class constant for thread safety
+      @pipe_cache : Hash(Array(Symbol), Array(::HTTP::Handler))
 
       property pipeline : Hash(Symbol, Array(::HTTP::Handler))
       property http_handler : ::HTTP::Handler?
@@ -12,6 +13,7 @@ module Grip
         @websocket_handler = nil,
       )
         @pipeline = Hash(Symbol, Array(HTTP::Handler)).new
+        @pipe_cache = Hash(Array(Symbol), Array(::HTTP::Handler)).new
       end
 
       def add_route(
@@ -27,11 +29,22 @@ module Grip
         Radix::Result(Route).new
       end
 
+      @[AlwaysInline]
       def call(context : ::HTTP::Server::Context)
-        if (websocket_handler && match_via_websocket(context)) ||
-           (http_handler && match_via_http(context))
-          return call_next(context)
+        # Try WebSocket first if handler exists
+        if ws = @websocket_handler
+          if match_via_websocket(context, ws.as(WebSocket))
+            return call_next(context)
+          end
         end
+
+        # Try HTTP if handler exists
+        if http = @http_handler
+          if match_via_http(context, http.as(HTTP))
+            return call_next(context)
+          end
+        end
+
         call_next(context)
       end
 
@@ -47,46 +60,46 @@ module Grip
         handlers = @pipeline[valve] ||= Array(::HTTP::Handler).new
         handlers << pipe
         handlers[-2]?.try &.next = pipe
+
+        # Invalidate cache when pipes change
+        @pipe_cache.clear
       end
 
+      @[AlwaysInline]
       def get(valve : Symbol) : Array(::HTTP::Handler)?
         @pipeline[valve]?
       end
 
       def get(valves : Array(Symbol)) : Array(::HTTP::Handler)
-        return CACHED_PIPES[valves] if CACHED_PIPES.has_key?(valves)
-
-        pipes = Array(::HTTP::Handler).new
-
-        valves.each do |valve|
-          @pipeline[valve]?.try &.each { |pipe| pipes << pipe }
+        # Check cache first
+        if cached = @pipe_cache[valves]?
+          return cached
         end
 
-        CACHED_PIPES[valves] = pipes
+        # Build pipe array
+        pipes = Array(::HTTP::Handler).new(valves.size * 2) # Size hint
+
+        valves.each do |valve|
+          if valve_pipes = @pipeline[valve]?
+            valve_pipes.each { |pipe| pipes << pipe }
+          end
+        end
+
+        @pipe_cache[valves] = pipes
         pipes
       end
 
+      @[AlwaysInline]
       def get(valve : Nil) : Nil
         nil
       end
 
-      def match_via_websocket(context : ::HTTP::Server::Context) : Bool
-        return false unless websocket_handler = @websocket_handler
-        ws_handler = websocket_handler.as(WebSocket)
+      @[AlwaysInline]
+      private def match_via_websocket(context : ::HTTP::Server::Context, ws_handler : WebSocket) : Bool
+        # Check upgrade first (cheaper than route lookup)
+        return false unless ws_handler.websocket_upgrade_request?(context)
 
         route = ws_handler.find_route("", context.request.path)
-        return false unless route.found? && ws_handler.websocket_upgrade_request?(context)
-
-        context.parameters = Parsers::ParameterBox.new(context.request, route.params)
-        route.payload.process_pipeline(context, self)
-        true
-      end
-
-      def match_via_http(context : ::HTTP::Server::Context) : Bool
-        return false unless http_handler = @http_handler
-        http = http_handler.as(HTTP)
-
-        route = find_http_route(http, context)
         return false unless route.found?
 
         context.parameters = Parsers::ParameterBox.new(context.request, route.params)
@@ -94,9 +107,19 @@ module Grip
         true
       end
 
-      private def find_http_route(http : HTTP, context : ::HTTP::Server::Context) : Radix::Result(Route)
+      @[AlwaysInline]
+      private def match_via_http(context : ::HTTP::Server::Context, http : HTTP) : Bool
         route = http.find_route(context.request.method, context.request.path)
-        route.found? ? route : http.find_route("ALL", context.request.path)
+
+        # Try ALL fallback if not found
+        unless route.found?
+          route = http.find_route("ALL", context.request.path)
+          return false unless route.found?
+        end
+
+        context.parameters = Parsers::ParameterBox.new(context.request, route.params)
+        route.payload.process_pipeline(context, self)
+        true
       end
     end
   end
