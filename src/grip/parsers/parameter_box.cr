@@ -53,31 +53,43 @@ module Grip
 
       @[AlwaysInline]
       def query : HTTP::Params
-        return @query.not_nil! if parsed?(FLAG_QUERY)
-        parse_query
-        mark_parsed(FLAG_QUERY)
-        @query.not_nil!
+        if parsed?(FLAG_QUERY)
+          @query || EMPTY_PARAMS
+        else
+          parse_query
+          mark_parsed(FLAG_QUERY)
+          @query || EMPTY_PARAMS
+        end
       end
 
       def body : HTTP::Params
-        return @body.not_nil! if parsed?(FLAG_BODY)
-        parse_body
-        mark_parsed(FLAG_BODY)
-        @body || EMPTY_PARAMS
+        if parsed?(FLAG_BODY)
+          @body || EMPTY_PARAMS
+        else
+          parse_body
+          mark_parsed(FLAG_BODY)
+          @body || EMPTY_PARAMS
+        end
       end
 
       def json : Hash(String, AllParamTypes)
-        return @json.not_nil! if parsed?(FLAG_JSON)
-        parse_json
-        mark_parsed(FLAG_JSON)
-        @json || EMPTY_JSON
+        if parsed?(FLAG_JSON)
+          @json || EMPTY_JSON
+        else
+          parse_json
+          mark_parsed(FLAG_JSON)
+          @json || EMPTY_JSON
+        end
       end
 
       def file : Hash(String, FileUpload)
-        return @file.not_nil! if parsed?(FLAG_FILE)
-        parse_file
-        mark_parsed(FLAG_FILE)
-        @file || EMPTY_FILE
+        if parsed?(FLAG_FILE)
+          @file || EMPTY_FILE
+        else
+          parse_file
+          mark_parsed(FLAG_FILE)
+          @file || EMPTY_FILE
+        end
       end
 
       @[AlwaysInline]
@@ -148,19 +160,22 @@ module Grip
       private def parse_file : Nil
         return if parsed?(FLAG_FILE)
 
-        @file = {} of String => FileUpload
+        file_hash = {} of String => FileUpload
 
         HTTP::FormData.parse(@request) do |upload|
           next unless upload
 
-          if filename = upload.filename
-            @file.not_nil![upload.name] = FileUpload.new(upload)
+          if upload.filename
+            file_hash[upload.name] = FileUpload.new(upload)
           else
             @body ||= HTTP::Params.new({} of String => Array(String))
-            @body.not_nil!.add(upload.name, upload.body.gets_to_end)
+            if body = @body
+              body.add(upload.name, upload.body.gets_to_end)
+            end
           end
         end
 
+        @file = file_hash
         mark_parsed(FLAG_FILE)
       end
 
@@ -180,16 +195,18 @@ module Grip
           return
         end
 
-        @json = {} of String => AllParamTypes
+        json_hash = {} of String => AllParamTypes
 
         case json = JSON.parse(body_str).raw
         when Hash
           json.each do |key, value|
-            @json.not_nil![key] = value.raw
+            json_hash[key] = value.raw
           end
         when Array
-          @json.not_nil!["_json"] = json
+          json_hash["_json"] = json
         end
+
+        @json = json_hash
       rescue JSON::ParseException
         @json = EMPTY_JSON
       end

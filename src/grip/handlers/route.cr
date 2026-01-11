@@ -42,7 +42,7 @@ module Grip
       @[AlwaysInline]
       def execute_override(context : ::HTTP::Server::Context) : ::HTTP::Server::Context
         # Direct call without .try since we check has_override? first
-        @override.not_nil!.call(context)
+        @override.try(&.call(context))
         context
       end
 
