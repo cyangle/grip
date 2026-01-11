@@ -12,7 +12,7 @@ module Grip
         @http_handler = nil,
         @websocket_handler = nil,
       )
-        @pipeline = Hash(Symbol, Array(HTTP::Handler)).new
+        @pipeline = Hash(Symbol, Array(::HTTP::Handler)).new
         @pipe_cache = Hash(Array(Symbol), Array(::HTTP::Handler)).new
       end
 
